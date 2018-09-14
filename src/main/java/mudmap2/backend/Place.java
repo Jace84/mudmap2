@@ -31,7 +31,7 @@ import mudmap2.backend.sssp.BreadthSearch;
  * A place in the world
  * @author neop
  */
-public class Place extends LayerElement implements Comparable<Place>, BreadthSearch {
+public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
 
     public static final String PLACEHOLDER_NAME = "?";
 
@@ -45,6 +45,9 @@ public class Place extends LayerElement implements Comparable<Place>, BreadthSea
     int recLevelMax = -1;
     RiskLevel riskLevel = null;
     String comments = "";
+    
+    int x, y;
+    Layer layer;
 
     HashSet<Place> children = new HashSet<>();
     HashSet<Place> parents = new HashSet<>();
@@ -54,7 +57,9 @@ public class Place extends LayerElement implements Comparable<Place>, BreadthSea
     BreadthSearchData breadthSearchData = null;
 
     public Place(final int id, final String name, final int posX, final int posY, final Layer l) {
-        super(posX, posY, l);
+        x = posX;
+        y = posY;
+        layer = l;
         this.name = name;
         this.id = id;
         if (id >= nextID) {
@@ -70,11 +75,53 @@ public class Place extends LayerElement implements Comparable<Place>, BreadthSea
      * @param l
      */
     public Place(final String name, final int posX, final int posY, final Layer l) {
-        super(posX, posY, l);
+        x = posX;
+        y = posY;
+        layer = l;
         this.name = name;
         id = nextID++;
     }
 
+    /**
+     * Gets the x position
+     * @return x position
+     */
+    @Override
+    public int getX(){
+        return x;
+    }
+    
+    /**
+     * Gets the y position
+     * @return y position
+     */
+    @Override
+    public int getY(){
+        return y;
+    }
+    
+    /**
+     * Gets the layer
+     * @return layer
+     */
+    @Override
+    public Layer getLayer(){
+        return layer;
+    }
+    
+    /**
+     * Sets the position
+     * @param x x position
+     * @param y y position
+     * @param layer layer
+     */
+    @Override
+    public void setPosition(int x, int y, Layer layer){
+        this.x = x;
+        this.y = y;
+        this.layer = layer;
+    }
+    
     /**
      * Gets the place id
      * @return place id

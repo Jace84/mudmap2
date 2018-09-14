@@ -27,46 +27,25 @@ package mudmap2.backend;
  * An element of a layer
  * @author neop
  */
-public class LayerElement {    
-    
-    private int x, y;
-    private Layer layer;
-    
-    /**
-     * constructs a layer element
-     * @param x x position
-     * @param y y position
-     * @param l layer
-     */
-    public LayerElement(int x, int y, Layer l){
-        this.x = x;
-        this.y = y;
-        layer = l;
-    }
-    
+public interface LayerElement {
+
     /**
      * Gets the x position
      * @return x position
      */
-    public int getX(){
-        return x;
-    }
+    public int getX();
     
     /**
      * Gets the y position
      * @return y position
      */
-    public int getY(){
-        return y;
-    }
+    public int getY();
     
     /**
      * Gets the layer
      * @return layer
      */
-    public Layer getLayer(){
-        return layer;
-    }
+    public Layer getLayer();
     
     /**
      * Sets the position
@@ -74,10 +53,6 @@ public class LayerElement {
      * @param y y position
      * @param layer layer
      */
-    protected void setPosition(int x, int y, Layer layer){
-        this.x = x;
-        this.y = y;
-        this.layer = layer;
-    }
+    void setPosition(int x, int y, Layer layer);
     
 }
