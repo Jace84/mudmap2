@@ -100,4 +100,12 @@ public class MementoAggregate implements Memento {
         return ownState != null;
     }
 
+    /**
+     * Get list of events
+     * @return list of events
+     */
+    protected List<Originator> getList(){
+        return events;
+    }
+
 }

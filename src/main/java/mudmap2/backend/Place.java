@@ -24,6 +24,8 @@ package mudmap2.backend;
 
 import java.util.HashSet;
 import java.util.TreeMap;
+import mudmap2.backend.memento.Memento;
+import mudmap2.backend.memento.Originator;
 
 import mudmap2.backend.sssp.BreadthSearch;
 
@@ -31,30 +33,30 @@ import mudmap2.backend.sssp.BreadthSearch;
  * A place in the world
  * @author neop
  */
-public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
+public class Place extends Originator implements LayerElement, Comparable<Place>, BreadthSearch {
 
     public static final String PLACEHOLDER_NAME = "?";
 
     // next id to be assigned
-    static int nextID;
+    private static int nextID;
 
-    int id;
-    String name;
-    PlaceGroup placeGroup = null;
-    int recLevelMin = -1;
-    int recLevelMax = -1;
-    RiskLevel riskLevel = null;
-    String comments = "";
-    
-    int x, y;
-    Layer layer;
+    private final int id;
+    private String name;
+    private PlaceGroup placeGroup = null;
+    private int recLevelMin = -1;
+    private int recLevelMax = -1;
+    private RiskLevel riskLevel = null;
+    private String comments = "";
 
-    HashSet<Place> children = new HashSet<>();
-    HashSet<Place> parents = new HashSet<>();
-    HashSet<Path> paths = new HashSet<>();
-    TreeMap<String, Boolean> flags = new TreeMap<>();
+    private int x, y;
+    private Layer layer;
 
-    BreadthSearchData breadthSearchData = null;
+    private HashSet<Place> children = new HashSet<>();
+    private HashSet<Place> parents = new HashSet<>();
+    private HashSet<Path> paths = new HashSet<>();
+    private TreeMap<String, Boolean> flags = new TreeMap<>();
+
+    protected BreadthSearchData breadthSearchData = null;
 
     public Place(final int id, final String name, final int posX, final int posY, final Layer l) {
         x = posX;
@@ -90,7 +92,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
     public int getX(){
         return x;
     }
-    
+
     /**
      * Gets the y position
      * @return y position
@@ -99,7 +101,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
     public int getY(){
         return y;
     }
-    
+
     /**
      * Gets the layer
      * @return layer
@@ -108,7 +110,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
     public Layer getLayer(){
         return layer;
     }
-    
+
     /**
      * Sets the position
      * @param x x position
@@ -117,11 +119,12 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
      */
     @Override
     public void setPosition(int x, int y, Layer layer){
+        mementoPush();
         this.x = x;
         this.y = y;
         this.layer = layer;
     }
-    
+
     /**
      * Gets the place id
      * @return place id
@@ -143,6 +146,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
      * @param name new name
      */
     public void setName(final String name) {
+        mementoPush();
         this.name = name;
         callWorldChangeListeners();
     }
@@ -168,6 +172,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
      * @param placeGroup
      */
     public void setPlaceGroup(final PlaceGroup placeGroup) {
+        mementoPush();
         this.placeGroup = placeGroup;
         if (placeGroup != null && getLayer() != null && getLayer().getWorld() != null) {
             getLayer().getWorld().addPlaceGroup(placeGroup);
@@ -188,6 +193,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
      * @param recLevelMin
      */
     public void setRecLevelMin(final int recLevelMin) {
+        mementoPush();
         this.recLevelMin = recLevelMin;
         callWorldChangeListeners();
     }
@@ -205,6 +211,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
      * @param recLevelMax
      */
     public void setRecLevelMax(final int recLevelMax) {
+        mementoPush();
         this.recLevelMax = recLevelMax;
         callWorldChangeListeners();
     }
@@ -222,6 +229,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
      * @param riskLevel
      */
     public void setRiskLevel(final RiskLevel riskLevel) {
+        mementoPush();
         this.riskLevel = riskLevel;
         callWorldChangeListeners();
     }
@@ -239,6 +247,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
      * @param comments
      */
     public void setComments(String comments) {
+        mementoPush();
         this.comments = comments;
     }
 
@@ -284,6 +293,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
      * @param path
      */
     public void removePath(final Path path) {
+        mementoPush();
         paths.remove(path);
         path.getOtherPlace(this).paths.remove(path);
         callWorldChangeListeners();
@@ -296,6 +306,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
      * @return true, if successfully connected
      */
     public boolean connectPath(final Path path) throws RuntimeException, NullPointerException {
+        mementoPush();
         final Place[] pp = path.getPlaces();
         Place other;
 
@@ -380,6 +391,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
      */
     public void setFlag(final String key, final boolean state) {
         if (key != null) {
+            mementoPush();
             flags.put(key, state);
             callWorldChangeListeners();
         }
@@ -399,6 +411,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
      */
     public void connectChild(final Place place) {
         if (place != null) {
+            mementoPush();
             children.add(place);
             place.parents.add(this);
             callWorldChangeListeners();
@@ -413,6 +426,7 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
      */
     public void removeChild(final Place place) {
         if (place != null) {
+            mementoPush();
             children.remove(place);
             place.parents.remove(this);
             callWorldChangeListeners();
@@ -461,6 +475,8 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
      * Removes all connections to other places (paths, child-connections)
      */
     public void removeConnections() {
+        mementoPush();
+
         // remove place paths (buffer, since connected_places will be modified)
         final HashSet<Path> cp_buffer = (HashSet<Path>) paths.clone();
         for (final Path p : cp_buffer) {
@@ -559,6 +575,72 @@ public class Place implements LayerElement, Comparable<Place>, BreadthSearch {
         if (getLayer() != null && getLayer().getWorld() != null) {
             getLayer().getWorld().callListeners(this);
         }
+    }
+
+    @Override
+    protected Memento createMemento() {
+        return new PlaceMemento(this);
+    }
+
+    @Override
+    protected void applyMemento(Memento memento) {
+        if(memento instanceof PlaceMemento){
+            ((PlaceMemento) memento).restore(this);
+        }
+    }
+
+    private class PlaceMemento implements Memento {
+
+        private final String name;
+        private final PlaceGroup placeGroup;
+        private final int recLevelMin;
+        private final int recLevelMax;
+        private final RiskLevel riskLevel;
+        private final String comments;
+
+        private final int x, y;
+        private final Layer layer;
+
+        private final HashSet<Place> children;
+        private final HashSet<Place> parents;
+        private final HashSet<Path> paths;
+        private final TreeMap<String, Boolean> flags;
+
+        public PlaceMemento(Place place) {
+            name = place.name;
+            placeGroup = place.placeGroup;
+            recLevelMax = place.recLevelMax;
+            recLevelMin = place.recLevelMin;
+            riskLevel = place.riskLevel;
+            comments = place.comments;
+
+            x = place.x;
+            y = place.y;
+            layer = place.layer;
+
+            children = new HashSet<>(place.children);
+            parents = new HashSet<>(place.parents);
+            paths = new HashSet<>(place.paths);
+            flags = new TreeMap<>(place.flags);
+        }
+
+        public void restore(Place place){
+            place.name = name;
+            place.placeGroup = placeGroup;
+            place.recLevelMax = recLevelMax;
+            place.recLevelMin = recLevelMin;
+            place.riskLevel = riskLevel;
+            place.comments = comments;
+
+            place.x = x;
+            place.y = y;
+
+            place.children = new HashSet<>(children);
+            place.parents = new HashSet<>(parents);
+            place.paths = new HashSet<>(paths);
+            place.flags = new TreeMap<>(flags);
+        }
+
     }
 
 }

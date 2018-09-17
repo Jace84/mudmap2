@@ -35,6 +35,8 @@ public class Quadtree<T> {
     private static final int DEFAULT_LENGTH = 1 << 30;
 
     private QuadtreeNode root;
+    private int centerX = 0;
+    private int centerY = 0;
 
     /** Constructs a quadtree */
     public Quadtree(){
@@ -47,7 +49,22 @@ public class Quadtree<T> {
      * @param centerY center y coordinate
      */
     public Quadtree(int centerX, int centerY){
+        this.centerX = centerX;
+        this.centerY = centerY;
         root = new QuadtreeNode(null, centerX, centerY, DEFAULT_LENGTH);
+    }
+
+    /**
+     * Flat copy of the quad tree
+     * @param quadtree
+     */
+    public Quadtree(Quadtree quadtree) {
+        centerX = quadtree.centerX;
+        centerY = quadtree.centerY;
+        root = new QuadtreeNode(null, centerX, centerY, DEFAULT_LENGTH);
+        if(quadtree != null && quadtree.root != null){
+            quadtree.root.copy(root);
+        }
     }
 
     /**
@@ -222,8 +239,9 @@ public class Quadtree<T> {
         /** checks whether the element is empty */
         public boolean isEmpty();
 
-        /** checks whether the element or one of its children contains object*/
+        /** checks whether the element or one of its children contains object */
         public boolean contains(T object);
+
     }
 
     /**
@@ -232,10 +250,10 @@ public class Quadtree<T> {
      */
     private class QuadtreeNode<T> implements QuadtreeElement<T>{
 
-        QuadtreeElement<T> parent;
-        int length; // size in each direction
+        private QuadtreeElement<T> parent;
+        private final int length; // size in each direction
         // max amount of children below this node: (2 * length)^2
-        final int x, y;
+        private final int x, y;
         private final QuadtreeElement<T> elements[] = new QuadtreeElement[4];
 
         // fake enum (no not-static enums in Java?)
@@ -515,6 +533,20 @@ public class Quadtree<T> {
             else if(elements[SW] != null && elements[SW].contains(object)) return true;
             return false;
         }
+
+        public void copy(QuadtreeNode target) {
+            for(int i = 0; i < 4; ++i){
+                QuadtreeElement element = elements[i];
+                if(element != null){
+                    if(element instanceof QuadtreeNode){
+                        target.elements[i] = new QuadtreeNode(target, element.getX(), element.getY(), ((QuadtreeNode) element).length);
+                    } else if(element instanceof QuadtreeLeaf) {
+                        target.elements[i] = new QuadtreeLeaf(((QuadtreeLeaf) element).data, element.getX(), element.getY());
+                        target.elements[i].setParent(target);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -657,5 +689,6 @@ public class Quadtree<T> {
         public boolean contains(T object) {
             return data == object;
         }
+
     }
 }

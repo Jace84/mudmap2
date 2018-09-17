@@ -404,6 +404,7 @@ public class WorldFileJSON extends WorldFile {
             throw new WorldFileReadError(filename, ex.getLocalizedMessage(), ex);
         }
 
+        world.mementoClear();
         return world;
     }
 

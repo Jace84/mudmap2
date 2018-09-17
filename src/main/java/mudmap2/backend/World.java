@@ -35,6 +35,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import mudmap2.backend.Layer.PlaceNotInsertedException;
 import mudmap2.backend.WorldFileReader.WorldFile;
+import mudmap2.backend.memento.AggregatingOriginator;
+import mudmap2.backend.memento.Memento;
 import mudmap2.backend.sssp.BreadthSearchGraph;
 import org.json.JSONObject;
 
@@ -42,38 +44,38 @@ import org.json.JSONObject;
  *
  * @author neop
  */
-public class World implements BreadthSearchGraph {
+public class World extends AggregatingOriginator implements BreadthSearchGraph {
 
     // worldname and file of the world
-    String worldname;
-    WorldFile worldFile;
+    private String worldName;
+    private WorldFile worldFile;
 
     // color of path lines and self-defined path colors
-    Color pathColorCardinal = new Color(0, 255, 0);
-    Color pathColorNonCardinal = new Color(0, 255, 0);
-    Color tileCenterColor = new Color(207, 190, 134);
-    final HashMap<String, Color> pathColors = new HashMap<>();
+    private Color pathColorCardinal = new Color(0, 255, 0);
+    private Color pathColorNonCardinal = new Color(0, 255, 0);
+    private Color tileCenterColor = new Color(207, 190, 134);
+    private HashMap<String, Color> pathColors = new HashMap<>();
 
     // Coordinates of the home position
-    WorldCoordinate home = new WorldCoordinate(0, 0, 0);
+    private WorldCoordinate home = new WorldCoordinate(0, 0, 0);
 
     // ID and object
-    final TreeMap<Integer, RiskLevel> riskLevels = new TreeMap<>();
-    final HashSet<PlaceGroup> placeGroups = new HashSet<>();
-    final TreeMap<Integer, Layer> layers = new TreeMap<>();
+    private TreeMap<Integer, RiskLevel> riskLevels = new TreeMap<>();
+    private HashSet<PlaceGroup> placeGroups = new HashSet<>();
+    private TreeMap<Integer, Layer> layers = new TreeMap<>();
 
     // For creating world-unique layer ids
-    Integer nextLayerID = 1;
+    private Integer nextLayerID = 1;
 
     // Preferences
-    ShowPlaceID showPlaceID = ShowPlaceID.UNIQUE;
+    private ShowPlaceID showPlaceID = ShowPlaceID.UNIQUE;
 
     // World-related preferences for dialogs etc.
-    JSONObject preferences = new JSONObject();
+    private JSONObject preferences = new JSONObject();
     public final static String PREFERENCES_KEY_DIALOG = "dialog";
 
     // Listeners
-    final LinkedList<WorldChangeListener> changeListeners = new LinkedList<>();
+    private final LinkedList<WorldChangeListener> changeListeners = new LinkedList<>();
 
     /**
      * Creates an empty world
@@ -87,7 +89,7 @@ public class World implements BreadthSearchGraph {
      * @param name worldname of the world
      */
     public World(String name){
-        worldname = name;
+        worldName = name;
         initialize();
     }
 
@@ -126,19 +128,20 @@ public class World implements BreadthSearchGraph {
      * @return world worldname
      */
     public String getName(){
-        if(worldname == null){
+        if(worldName == null){
             return "unnamed";
         } else {
-            return worldname;
+            return worldName;
         }
     }
 
     /**
      * Sets the world worldname
-     * @param n new world worldname
+     * @param name new world worldname
      */
-    public void setName(String n){
-        worldname = n;
+    public void setName(String name){
+        mementoPush();
+        worldName = name;
         callListeners(this);
     }
 
@@ -156,6 +159,7 @@ public class World implements BreadthSearchGraph {
      * @param home
      */
     public void setHome(WorldCoordinate home){
+        mementoPush();
         this.home = home;
     }
 
@@ -214,9 +218,12 @@ public class World implements BreadthSearchGraph {
             throw new NullPointerException();
         }
 
+        mementoPush();
+
         if(!layers.containsKey(layer.getId()))
             layers.put(layer.getId(), layer);
 
+        layer.setOriginatorListener(this);
         addChangeListener(layer);
         callListeners(layer);
     }
@@ -328,6 +335,8 @@ public class World implements BreadthSearchGraph {
             throw new NullPointerException();
         }
 
+        mementoPush();
+
         pathColors.put(dir, color);
         callListeners(this);
     }
@@ -341,6 +350,8 @@ public class World implements BreadthSearchGraph {
             throw new NullPointerException();
         }
 
+        mementoPush();
+
         pathColorCardinal = color;
         callListeners(this);
     }
@@ -353,6 +364,8 @@ public class World implements BreadthSearchGraph {
         if(color == null){
             throw new NullPointerException();
         }
+
+        mementoPush();
 
         pathColorNonCardinal = color;
         callListeners(this);
@@ -374,6 +387,8 @@ public class World implements BreadthSearchGraph {
         if(color == null){
             throw new NullPointerException();
         }
+
+        mementoPush();
 
         tileCenterColor = color;
         callListeners(this);
@@ -423,6 +438,8 @@ public class World implements BreadthSearchGraph {
             throw new NullPointerException();
         }
 
+        mementoPush();
+
         if(!placeGroups.contains(placeGroup)){
             placeGroups.add(placeGroup);
         }
@@ -434,6 +451,8 @@ public class World implements BreadthSearchGraph {
      * @param placeGroup PlaceGroup to be removed
      */
     public void removePlaceGroup(PlaceGroup placeGroup){
+        mementoPush();
+
         for(Layer layer: getLayers()){
             for(Place p: layer.getPlaces()){
                 if(p.getPlaceGroup() == placeGroup) p.setPlaceGroup(null);
@@ -470,6 +489,8 @@ public class World implements BreadthSearchGraph {
             throw new NullPointerException();
         }
 
+        mementoPush();
+
         if(!riskLevels.containsValue(rl)){
             // ID-collision?
             while(riskLevels.containsKey(rl.getId())){
@@ -486,6 +507,7 @@ public class World implements BreadthSearchGraph {
      * @param rl risk level to add or replace
      */
     public void setRiskLevel(RiskLevel rl){
+        mementoPush();
         riskLevels.put(rl.getId(), rl);
     }
 
@@ -496,6 +518,8 @@ public class World implements BreadthSearchGraph {
      */
     public void removeRiskLevel(RiskLevel rl) throws Exception {
         if(rl != null){
+            mementoPush();
+
             if(!riskLevels.containsValue(rl)) throw new Exception("Tried to remove risk level that does not belong to this world");
             // remode from risk level list
             riskLevels.remove(rl.getId());
@@ -589,4 +613,68 @@ public class World implements BreadthSearchGraph {
             listener.worldChanged(source);
         }
     }
+
+
+    @Override
+    protected Memento createMemento() {
+        return new WorldMemento(this);
+    }
+
+    @Override
+    protected void applyMemento(Memento memento) {
+        if(memento instanceof WorldMemento){
+            ((WorldMemento) memento).restore(this);
+        }
+    }
+
+    private class WorldMemento implements Memento {
+
+        private final String worldName;
+
+        // color of path lines and self-defined path colors
+        private final Color pathColorCardinal;
+        private final Color pathColorNonCardinal;
+        private final Color tileCenterColor;
+        private final HashMap<String, Color> pathColors;
+
+        // Coordinates of the home position
+        private final WorldCoordinate home;
+
+        // ID and object
+        private final TreeMap<Integer, RiskLevel> riskLevels;
+        private final HashSet<PlaceGroup> placeGroups;
+        private final TreeMap<Integer, Layer> layers;
+
+        public WorldMemento(World world) {
+            worldName = world.getName();
+
+            pathColorCardinal = world.pathColorCardinal;
+            pathColorNonCardinal = world.pathColorNonCardinal;
+            tileCenterColor = world.tileCenterColor;
+            pathColors = new HashMap(world.pathColors);
+
+            home = world.home;
+
+            riskLevels = new TreeMap<>(world.riskLevels);
+            placeGroups = new HashSet<>(world.placeGroups);
+            layers = new TreeMap<>(world.layers);
+        }
+
+        public void restore(World world) {
+            world.worldName = worldName;
+
+            world.pathColorCardinal = pathColorCardinal;
+            world.pathColorNonCardinal = pathColorNonCardinal;
+            world.tileCenterColor = tileCenterColor;
+            world.pathColors = new HashMap<>(pathColors);
+
+            world.home = home;
+
+            world.riskLevels = new TreeMap<>(riskLevels);
+            world.placeGroups = new HashSet(placeGroups);
+            world.layers = new TreeMap<>(layers);
+        }
+
+    }
+
 }

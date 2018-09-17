@@ -48,6 +48,7 @@ public abstract class Originator {
 
         Memento memento = createMemento();
         if(memento != null){
+            System.out.println(">> push");
             mementoStored.push(memento);
             mementoRestored.clear();
 
@@ -64,12 +65,13 @@ public abstract class Originator {
         /**
          * Lock this method in case it's not called by its parent
          */
-        if(originatorListener != null){
+        if(originatorListener == null){
             /**
              * - remove last top stored element
              * - add it to restore elements
              */
             if(mementoCanRestore()) {
+                System.out.println(">> restore, s: " + mementoStored.size() + ", r: " + mementoRestored.size());
                 // apply Memento if it is no aggregate, then push list
                 if(!(mementoStored.poll() instanceof AggregatingOriginator)) {
                     applyMemento(mementoStored.poll());
@@ -87,12 +89,13 @@ public abstract class Originator {
         /**
          * Lock this method in case it's not called by its parent
          */
-        if(originatorListener != null){
+        if(originatorListener == null){
             /**
              * - remove last restored element
              * - add it to stored elements
              */
             if(mementoCanStore()) {
+                System.out.println(">> store");
                 // apply Memento if it is no aggregate, then push list
                 if(!(mementoStored.poll() instanceof AggregatingOriginator)) {
                     applyMemento(mementoStored.poll());
@@ -115,8 +118,24 @@ public abstract class Originator {
         this.originatorListener = originatorListener;
     }
 
-    abstract Memento createMemento();
+    /**
+     * Store data in Memento object
+     * @return
+     */
+    protected abstract Memento createMemento();
 
-    abstract void applyMemento(Memento memento);
+    /**
+     * Apply data stored in Memento
+     * @param memento
+     */
+    protected abstract void applyMemento(Memento memento);
+
+    /**
+     * Clear events
+     */
+    public void mementoClear(){
+        mementoRestored.clear();
+        mementoStored.clear();
+    }
 
 }

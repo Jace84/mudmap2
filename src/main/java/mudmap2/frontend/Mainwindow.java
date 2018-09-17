@@ -441,20 +441,22 @@ public final class Mainwindow extends JFrame implements KeyEventDispatcher, Acti
     @Override
     public boolean dispatchKeyEvent(final KeyEvent e) {
         // ctrl modifier
-        if (e.isControlDown()) {
-            // go to search box (side bar of current world tab)
-            if (e.getKeyCode() == KeyEvent.VK_F) {
+        if (KeyEvent.KEY_PRESSED == e.getID() && e.isControlDown()) {
+            switch (e.getKeyCode()) {
+            case KeyEvent.VK_F:
+            {
                 final WorldTab wt = getSelectedTab();
                 if (wt != null) {
                     wt.focusSidePanelSearchBox();
                 }
                 return true;
             }
-        }
-
-        // no modifier
-        if (KeyEvent.KEY_PRESSED == e.getID() && e.isControlDown()) {
-            switch (e.getKeyCode()) {
+            case KeyEvent.VK_O: // open world
+            {
+                final OpenWorldDialog dlg = new OpenWorldDialog(this);
+                dlg.setVisible();
+                return true;
+            }
             case KeyEvent.VK_S: // save world
             {
                 final WorldTab wt = getSelectedTab();
@@ -463,10 +465,22 @@ public final class Mainwindow extends JFrame implements KeyEventDispatcher, Acti
                 }
                 return true;
             }
-            case KeyEvent.VK_O: // open world
+            case KeyEvent.VK_Z: // undo change(s)
             {
-                final OpenWorldDialog dlg = new OpenWorldDialog(this);
-                dlg.setVisible();
+                final WorldTab wt = getSelectedTab();
+                if (wt != null) {
+                    wt.getWorld().mementoRestore();
+                    wt.repaint();
+                }
+                return true;
+            }
+            case KeyEvent.VK_Y: // undo change(s)
+            {
+                final WorldTab wt = getSelectedTab();
+                if (wt != null) {
+                    wt.getWorld().mementoStore();
+                    wt.repaint();
+                }
                 return true;
             }
             }

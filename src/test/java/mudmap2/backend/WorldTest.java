@@ -399,65 +399,6 @@ public class WorldTest {
     }
 
     /**
-     * Test of getPathColorStd method, of class World.
-     */
-    @Test
-    public void testGetPathColorStd() {
-        System.out.println("getPathColorStd");
-
-        World instance = new World("MyWorld");
-        Color expResult = instance.pathColorCardinal;
-        Color result = instance.getPathColorStd();
-        assertEquals(expResult, result);
-    }
-
-    /**
-     * Test of getPathColorNstd method, of class World.
-     */
-    @Test
-    public void testGetPathColorNstd() {
-        System.out.println("getPathColorNstd");
-
-        World instance = new World("MyWorld");
-        Color expResult = instance.pathColorNonCardinal;
-        Color result = instance.getPathColorNstd();
-        assertEquals(expResult, result);
-    }
-
-    /**
-     * Test of getPathColor method, of class World.
-     */
-    @Test
-    public void testGetPathColor() {
-        System.out.println("getPathColor");
-
-        World instance = new World("MyWorld");
-
-        String dir1 = "";
-        Color expResult1 = instance.pathColorNonCardinal;
-        Color result1 = instance.getPathColor(dir1);
-        assertEquals(expResult1, result1);
-
-        String dir2 = "n";
-        Color expResult2 = instance.pathColorCardinal;
-        Color result2 = instance.getPathColor(dir2);
-        assertEquals(expResult2, result2);
-
-        String dir3 = "u";
-        Color expResult3 = instance.pathColorNonCardinal;
-        Color result3 = instance.getPathColor(dir3);
-        assertEquals(expResult3, result3);
-
-        String dir4 = "foo";
-        Color expResult4 = instance.pathColorNonCardinal;
-        Color result4 = instance.getPathColor(dir4);
-        assertEquals(expResult4, result4);
-
-        // test null
-        assertEquals(instance.getPathColorStd(), instance.getPathColor(null));
-    }
-
-    /**
      * Test of setPathColor method, of class World.
      */
     @Test
@@ -553,19 +494,6 @@ public class WorldTest {
     }
 
     /**
-     * Test of getTileCenterColor method, of class World.
-     */
-    @Test
-    public void testGetTileCenterColor() {
-        System.out.println("getTileCenterColor");
-
-        World instance = new World("MyWorld");
-        Color expResult = instance.tileCenterColor;
-        Color result = instance.getTileCenterColor();
-        assertEquals(expResult, result);
-    }
-
-    /**
      * Test of setTileCenterColor method, of class World.
      */
     @Test
@@ -575,7 +503,7 @@ public class WorldTest {
         Color color = Color.MAGENTA;
         World instance = new World("MyWorld");
         instance.setTileCenterColor(color);
-        assertEquals(color, instance.tileCenterColor);
+        assertEquals(color, instance.getTileCenterColor());
 
         try {
             instance.setTileCenterColor(null);

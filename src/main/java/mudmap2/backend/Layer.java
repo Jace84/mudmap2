@@ -32,6 +32,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import mudmap2.backend.memento.AggregatingOriginator;
+import mudmap2.backend.memento.Memento;
 
 import mudmap2.backend.prquadtree.Quadtree;
 import mudmap2.utils.Pair;
@@ -42,23 +44,23 @@ import mudmap2.utils.Pair;
  *
  * @author neop
  */
-public class Layer implements WorldChangeListener {
+public class Layer extends AggregatingOriginator implements WorldChangeListener {
 
-    World world;
-    Integer id;
-    String name;
-    Quadtree<LayerElement> elements = new Quadtree<>();
+    private World world;
+    private final Integer id;
+    private String name;
+    private Quadtree<LayerElement> elements = new Quadtree<>();
 
     // for quadtree optimization
-    int maxX = 0;
-    int minX = 0;
-    int maxY = 0;
-    int minY = 0;
+    private int maxX = 0;
+    private int minX = 0;
+    private int maxY = 0;
+    private int minY = 0;
 
     // place name cache for unique check
-    HashMap<String, Integer> placeNameCache = new HashMap<>();
-    boolean placeNameCacheNeedsUpdate = true;
-    boolean sizeCacheNeedsUpdated = true;
+    private final HashMap<String, Integer> placeNameCache = new HashMap<>();
+    private boolean placeNameCacheNeedsUpdate = true;
+    private boolean sizeCacheNeedsUpdated = true;
 
     /**
      * Constructor, sets layer id
@@ -107,6 +109,7 @@ public class Layer implements WorldChangeListener {
      * @param name
      */
     public void setName(final String name) {
+        mementoPush();
         this.name = name;
     }
 
@@ -215,6 +218,8 @@ public class Layer implements WorldChangeListener {
      * @throws mudmap2.backend.Layer.PlaceNotInsertedException
      */
     public void put(final LayerElement element) throws PlaceNotInsertedException {
+        mementoPush();
+
         try {
             // remove element from other layer if one is set
             if(element.getLayer() != null){
@@ -223,6 +228,7 @@ public class Layer implements WorldChangeListener {
 
             elements.insert(element, element.getX(), element.getY());
             sizeCacheNeedsUpdated = true;
+            ((Place) element).setOriginatorListener(this);
             world.callListeners(element);
         } catch (final Exception ex) {
             throw new PlaceNotInsertedException(element.getX(), element.getY());
@@ -287,6 +293,8 @@ public class Layer implements WorldChangeListener {
      * @param element
      */
     public void remove(final LayerElement element) {
+        mementoPush();
+
         elements.remove(element);
         world.callListeners(this);
     }
@@ -444,22 +452,56 @@ public class Layer implements WorldChangeListener {
         }
     }
 
+    @Override
+    protected Memento createMemento() {
+        return new LayerMemento(this);
+    }
+
+    @Override
+    protected void applyMemento(Memento memento) {
+        if(memento instanceof LayerMemento) {
+            ((LayerMemento) memento).restore(this);
+        }
+    }
+
+    private class LayerMemento implements Memento {
+
+        private final World world;
+        private final String name;
+        private final Quadtree<LayerElement> elements;
+
+        public LayerMemento(Layer layer) {
+            world = layer.world;
+            name = layer.name;
+            elements = new Quadtree<>(layer.elements);
+        }
+
+        public void restore(Layer layer) {
+            layer.world = world;
+            layer.name = name;
+            layer.elements = new Quadtree<>(elements);
+
+            layer.placeNameCacheNeedsUpdate = true;
+            layer.sizeCacheNeedsUpdated = true;
+        }
+
+    }
+
     /**
      * This exception will be thrown, if a place doesn't exist at a certain position
      */
     public static class PlaceNotFoundException extends Exception {
 
-        private static final long serialVersionUID = 1L;
         int x, y;
 
         /**
          * Constructs an exception
-         * @param _x x coordinate of the place
-         * @param _y y coordinate of the place
+         * @param x x coordinate of the place
+         * @param y y coordinate of the place
          */
-        public PlaceNotFoundException(final int _x, final int _y) {
-            x = _x;
-            y = _y;
+        public PlaceNotFoundException(final int x, final int y) {
+            this.x = x;
+            this.y = y;
         }
 
         @Override
@@ -470,17 +512,16 @@ public class Layer implements WorldChangeListener {
 
     public static class PlaceNotInsertedException extends Exception {
 
-        private static final long serialVersionUID = 1L;
         int x, y;
 
         /**
          * Constructs an exception
-         * @param _x x coordinate of the place
-         * @param _y y coordinate of the place
+         * @param x x coordinate of the place
+         * @param y y coordinate of the place
          */
-        public PlaceNotInsertedException(final int _x, final int _y) {
-            x = _x;
-            y = _y;
+        public PlaceNotInsertedException(final int x, final int y) {
+            this.x = x;
+            this.y = y;
         }
 
         @Override
