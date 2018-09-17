@@ -16,101 +16,201 @@
  */
 package mudmap2.backend.memento;
 
+import java.util.LinkedList;
+
 /**
  * Originator of Memento pattern, this Originator aggregates multiple events in one memento
  * @author neop
  */
-public abstract class AggregatingOriginator extends Originator implements OriginatorListener {
-
-    // Only add events to aggregate if this is on top of stack
-    private MementoAggregate currentAggregate = null;
+public abstract class AggregatingOriginator implements OriginatorListener {
 
     /**
-     * Start a new aggregate
+     * All pop and push events will be notified to this listener
      */
-    public void mementoAggregateBegin(){
-        currentAggregate = new MementoAggregate();
-        mementoStored.push(currentAggregate);
-        mementoRestored.clear();
+    protected OriginatorListener originatorListener = null;
 
-        // announce new aggregate
-        if(originatorListener != null) {
-            originatorListener.onMementoPush(this);
-        }
-    }
+    private boolean savedLatestState = false;
 
     /**
-     * Close an aggregate
+     * Saved states
      */
-    public void mementoAggregateEnd(){
-        currentAggregate = null;
-    }
+    protected final LinkedList<Memento> mementoRestored = new LinkedList<>();
+    protected final LinkedList<Memento> mementoStored = new LinkedList<>();
+
+    // wait 1000 ms before an aggregate is created
+    private static final long AGGREGATE_WAITING_TIME = 1000;
 
     /**
      * "save state"
      */
-    @Override
     public void mementoPush(){
-        // if an aggregate is open: add to aggregate
-        if(currentAggregate != null && mementoStored.peek() == currentAggregate) {
-            // set own state if it has not been set yet
-            if(!currentAggregate.hasOwnState()){
-                currentAggregate.setOwnState(createMemento());
+        if(onMementoPush(this)) {
+            /**
+             * do not push event if this is the uppermost originator:
+             * this creates infinite loops. It will be handled by onMementoPush()
+             */
+            if(hasParent()) {
+                mementoPush(createMemento());
             }
-        } else {
-            currentAggregate = null;
-            super.mementoPush();
+        }
+    }
+
+    private void mementoPush(Memento memento){
+        /**
+         * - clear restored mementos
+         * - add new memento
+         * - announce new state
+         */
+        if(memento != null){
+            System.out.println(">> push, s: " + mementoStored.size() + ", r: " + mementoRestored.size() + ", " + this.toString());
+            mementoStored.push(memento);
+            mementoRestored.clear();
+            savedLatestState = false;
         }
     }
 
     /**
      * "undo"
      */
-    @Override
     public void mementoRestore(){
-        currentAggregate = null;
-        Memento restoreThis = mementoStored.peek();
-        if(restoreThis != null && restoreThis instanceof MementoAggregate){
-            // restore aggregate
-            ((MementoAggregate) restoreThis).restore();
+        System.out.println(">> restore, s: " + mementoStored.size() + ", r: " + mementoRestored.size() + ", " + this.toString());
+
+        if(mementoCanRestore()) {
+            // restore stored events
+            final Memento top = mementoStored.peek();
+
+            // apply memento
+            if(top instanceof MementoAggregate) {
+                // aggregate
+                ((MementoAggregate) top).restore();
+            } else {
+                // normal memento
+                if(!savedLatestState) {
+                    final Memento latestMemento = createMemento();
+                    if(latestMemento != null) {
+                        System.out.println(">> saved Latest, s: " + mementoStored.size() + ", r: " + mementoRestored.size() + ", " + this.toString());
+                        mementoPush();
+                    }
+                    savedLatestState = true; // TODO: fix double undo issue by checking this variable
+                }
+                applyMemento(top);
+            }
+
+            /**
+             * - remove last top stored element
+             * - add it to restore elements
+             */
+            mementoRestored.push(mementoStored.pop());
+
+            // if end is reached, go back one step
+            if(mementoStored.isEmpty()) {
+                mementoStore();
+            }
         }
-        super.mementoRestore();
     }
 
     /**
      * "redo"
      */
-    @Override
     public void mementoStore(){
-        currentAggregate = null;
-        Memento storeThis = mementoRestored.peek();
-        if(storeThis != null && storeThis instanceof MementoAggregate){
-            // store aggregate
-            ((MementoAggregate) storeThis).store();
+        System.out.println(">> store, s: " + mementoStored.size() + ", r: " + mementoRestored.size() + ", " + this.toString());
+
+        if(mementoCanStore()) {
+            // store restored events
+            final Memento top = mementoRestored.peek();
+
+            // apply memento
+            if(top instanceof MementoAggregate) {
+                // aggregate
+                ((MementoAggregate) top).store();
+            } else {
+                // normal memento
+                applyMemento(top);
+            }
+
+            /**
+             * - remove last restored element
+             * - add it to stored elements
+             */
+            mementoStored.push(mementoRestored.pop());
         }
-        super.mementoStore();
     }
 
     /**
-     * Receive originator event
-     * @param source
+     * Clear events
      */
+    public void mementoClear(){
+        mementoRestored.clear();
+        mementoStored.clear();
+
+        System.out.println(">> clear, s: " + mementoStored.size() + ", r: " + mementoRestored.size() + ", " + this.toString());
+    }
+
+    public boolean mementoCanRestore(){
+        return !mementoStored.isEmpty();
+    }
+
+    public boolean mementoCanStore(){
+        return !mementoRestored.isEmpty();
+    }
+
+    private boolean hasParent(){
+        return originatorListener != null;
+    }
+
+    /**
+     * Store data in Memento object
+     * @return
+     */
+    protected abstract Memento createMemento();
+
+    /**
+     * Apply data stored in Memento
+     * @param memento
+     */
+    protected abstract void applyMemento(Memento memento);
+
+    public void setOriginatorListener(OriginatorListener originatorListener) {
+        this.originatorListener = originatorListener;
+    }
+
     @Override
-    public void onMementoPush(Originator source) {
-        if(currentAggregate != null && mementoStored.peek() == currentAggregate) {
-            // if an aggregate is open: add to aggregate
-            currentAggregate.add(source);
-        } else if(originatorListener != null) {
-            // if this Originator has a parent: forward event
-            currentAggregate = null;
-            originatorListener.onMementoPush(source);
+    public boolean onMementoPush(AggregatingOriginator source){
+        if(hasParent()){
+            // aggregate if parent is set
+            return originatorListener.onMementoPush(source);
         } else {
-            // if this Originator has no parent and no open aggregate: add to memento list
-            currentAggregate = null;
-            mementoRestored.clear();
-            // encapsulate event in Aggregate so it is handled as memento
-            mementoStored.add(new MementoAggregate(source));
+            MementoAggregate currentAggregate = getCurrentAggregate();
+            if(currentAggregate == null) {
+                currentAggregate = new MementoAggregate();
+                mementoPush(currentAggregate);
+            }
+
+            if(!currentAggregate.contains(source)) {
+                if(source == this) {
+                    currentAggregate.setOwnState(createMemento());
+                } else {
+                    currentAggregate.add(source);
+                }
+                return true;
+            } else {
+                return false;
+            }
         }
+    }
+
+    private MementoAggregate getCurrentAggregate(){
+        if(!mementoStored.isEmpty()) {
+            final Memento top = mementoStored.peek();
+            if(top instanceof MementoAggregate) {
+                final MementoAggregate aggregate = (MementoAggregate) top;
+                final long curTime = System.currentTimeMillis();
+                if(curTime - aggregate.getFirstEventTime() <= AGGREGATE_WAITING_TIME){
+                    return aggregate;
+                }
+            }
+        }
+        return null;
     }
 
 }

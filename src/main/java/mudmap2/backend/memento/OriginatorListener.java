@@ -26,6 +26,6 @@ public interface OriginatorListener {
      * Indicates a single push event from a subordinate Originator
      * @param source
      */
-    void onMementoPush(Originator source);
+    boolean onMementoPush(AggregatingOriginator source);
 
 }

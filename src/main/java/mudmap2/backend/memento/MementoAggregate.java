@@ -28,17 +28,22 @@ public class MementoAggregate implements Memento {
     /**
      * List of Originator events
      */
-    private final List<Originator> events = new LinkedList<>();
+    private final List<AggregatingOriginator> events = new LinkedList<>();
 
     /**
      * State of own Originator
      */
     private Memento ownState = null;
 
+    /**
+     * Time of first event in ms
+     */
+    private long firstEventTime = 0;
+
     public MementoAggregate(){
     }
 
-    public MementoAggregate(Originator event){
+    public MementoAggregate(AggregatingOriginator event){
         events.add(event);
     }
 
@@ -46,7 +51,10 @@ public class MementoAggregate implements Memento {
      * Add Originator event to list
      * @param event Originator that threw this event
      */
-    public void add(Originator event){
+    public void add(AggregatingOriginator event){
+        if(firstEventTime == 0) {
+            firstEventTime = System.currentTimeMillis();
+        }
         events.add(event);
     }
 
@@ -62,7 +70,7 @@ public class MementoAggregate implements Memento {
      * store all Originators event
      */
     public void store(){
-        for(Originator event: events){
+        for(AggregatingOriginator event: events){
             event.mementoStore();
         }
     }
@@ -71,7 +79,7 @@ public class MementoAggregate implements Memento {
      * Restore all Originators event
      */
     public void restore(){
-        for(Originator event: events){
+        for(AggregatingOriginator event: events){
             event.mementoRestore();
         }
     }
@@ -101,11 +109,24 @@ public class MementoAggregate implements Memento {
     }
 
     /**
+     * Check whether list contains source
+     * @param source event source
+     * @return true if list contains source
+     */
+    public boolean contains(AggregatingOriginator source){
+        return events.contains(source);
+    }
+
+    /**
      * Get list of events
      * @return list of events
      */
-    protected List<Originator> getList(){
+    protected List<AggregatingOriginator> getList(){
         return events;
+    }
+
+    public long getFirstEventTime() {
+        return firstEventTime;
     }
 
 }

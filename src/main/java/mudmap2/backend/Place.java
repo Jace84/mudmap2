@@ -24,8 +24,8 @@ package mudmap2.backend;
 
 import java.util.HashSet;
 import java.util.TreeMap;
+import mudmap2.backend.memento.AggregatingOriginator;
 import mudmap2.backend.memento.Memento;
-import mudmap2.backend.memento.Originator;
 
 import mudmap2.backend.sssp.BreadthSearch;
 
@@ -33,7 +33,7 @@ import mudmap2.backend.sssp.BreadthSearch;
  * A place in the world
  * @author neop
  */
-public class Place extends Originator implements LayerElement, Comparable<Place>, BreadthSearch {
+public class Place extends AggregatingOriginator implements LayerElement, Comparable<Place>, BreadthSearch {
 
     public static final String PLACEHOLDER_NAME = "?";
 
