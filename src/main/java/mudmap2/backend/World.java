@@ -223,7 +223,7 @@ public class World extends AggregatingOriginator implements BreadthSearchGraph {
         if(!layers.containsKey(layer.getId()))
             layers.put(layer.getId(), layer);
 
-        layer.setOriginatorListener(this);
+        layer.setParent(this);
         addChangeListener(layer);
         callListeners(layer);
     }

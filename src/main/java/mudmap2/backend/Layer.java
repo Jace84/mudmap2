@@ -228,7 +228,7 @@ public class Layer extends AggregatingOriginator implements WorldChangeListener 
 
             elements.insert(element, element.getX(), element.getY());
             sizeCacheNeedsUpdated = true;
-            ((Place) element).setOriginatorListener(this);
+            ((Place) element).setParent(this);
             world.callListeners(element);
         } catch (final Exception ex) {
             throw new PlaceNotInsertedException(element.getX(), element.getY());

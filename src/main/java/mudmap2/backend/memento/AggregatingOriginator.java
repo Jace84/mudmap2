@@ -16,96 +16,124 @@
  */
 package mudmap2.backend.memento;
 
+import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map.Entry;
 
 /**
  * Originator of Memento pattern, this Originator aggregates multiple events in one memento
  * @author neop
  */
-public abstract class AggregatingOriginator implements OriginatorListener {
+public abstract class AggregatingOriginator {
 
-    /**
-     * All pop and push events will be notified to this listener
-     */
-    protected OriginatorListener originatorListener = null;
-
-    private boolean savedLatestState = false;
+    // wait 1000 ms before an aggregate is created
+    private static final long WAITING_TIME = 1000;
 
     /**
      * Saved states
      */
-    protected final LinkedList<Memento> mementoRestored = new LinkedList<>();
-    protected final LinkedList<Memento> mementoStored = new LinkedList<>();
+    private final LinkedList<Key> events = new LinkedList<>();
+    private long currentTimeKey = 0;
 
-    // wait 1000 ms before an aggregate is created
-    private static final long AGGREGATE_WAITING_TIME = 1000;
+    /**
+     * All pop and push events will be notified to this listener
+     */
+    protected AggregatingOriginator parent = null;
+
+    private boolean savedLatestState = false;
 
     /**
      * "save state"
      */
     public void mementoPush(){
-        if(onMementoPush(this)) {
-            /**
-             * do not push event if this is the uppermost originator:
-             * this creates infinite loops. It will be handled by onMementoPush()
-             */
-            if(hasParent()) {
-                mementoPush(createMemento());
-            }
+        final long timeKey = onMementoPush(this);
+
+        // remove all keys ahead of currentTimeKey
+        while(!events.isEmpty() && events.peek().getTimestamp() > currentTimeKey) {
+            events.pop();
         }
+        currentTimeKey = timeKey;
+
+        // create memento
+        final Memento memento = createMemento();
+        mementoPush(this, memento);
     }
 
-    private void mementoPush(Memento memento){
-        /**
-         * - clear restored mementos
-         * - add new memento
-         * - announce new state
-         */
-        if(memento != null){
-            System.out.println(">> push, s: " + mementoStored.size() + ", r: " + mementoRestored.size() + ", " + this.toString());
-            mementoStored.push(memento);
-            mementoRestored.clear();
-            savedLatestState = false;
+    private void mementoPush(AggregatingOriginator originator, Memento memento){
+        // get key or create a new one
+        Key currentKey;
+        if(!events.isEmpty() && events.peek().getTimestamp() == currentTimeKey) {
+            currentKey = events.peek();
+        } else {
+            currentKey = new Key(currentTimeKey);
+            events.add(currentKey);
         }
+
+        System.out.println(">> push " + events.size() + ", " + this.toString());
+
+        // add memento to key
+        currentKey.add(originator, memento);
+    }
+
+    private int getKeyIdx(final long timeKey){
+        // find current key
+        int keyIdx = 0;
+        for(;keyIdx < events.size(); ++keyIdx) {
+            if(events.get(keyIdx).getTimestamp() == timeKey) {
+                break;
+            }
+        }
+        return keyIdx;
+    }
+
+    private void setKey(final long timestamp){
+        // don't do anything if history is empty or if timestamp is equal
+        if(events.isEmpty() || timestamp == currentTimeKey) {
+            return;
+        }
+
+        // find current key
+        int keyIdx = getKeyIdx(currentTimeKey);
+
+        // apply keys
+        long lastKeyIdx = currentTimeKey;
+        if(timestamp > currentTimeKey) {
+            for(;keyIdx < events.size(); ++keyIdx) {
+                Key event = events.get(keyIdx);
+                if(event.getTimestamp() <= timestamp) {
+                    event.apply();
+                    lastKeyIdx = event.getTimestamp();
+                } else {
+                    System.out.println(">> set from " + lastKeyIdx + " to " + lastKeyIdx);
+                    break;
+                }
+            }
+        } else if(timestamp < currentTimeKey) {
+            for(;keyIdx >= 0; --keyIdx) {
+                Key event = events.get(keyIdx);
+                if(event.getTimestamp() >= timestamp) {
+                    event.apply();
+                    lastKeyIdx = event.getTimestamp();
+                } else {
+                    System.out.println(">> set from " + lastKeyIdx + " to " + lastKeyIdx);
+                    break;
+                }
+            }
+        }
+        currentTimeKey = lastKeyIdx;
     }
 
     /**
      * "undo"
      */
     public void mementoRestore(){
-        System.out.println(">> restore, s: " + mementoStored.size() + ", r: " + mementoRestored.size() + ", " + this.toString());
+        // find current key
+        int keyIdx = getKeyIdx(currentTimeKey);
 
-        if(mementoCanRestore()) {
-            // restore stored events
-            final Memento top = mementoStored.peek();
+        System.out.println(">> restore " + keyIdx + " / " + events.size() + ", " + this.toString());
 
-            // apply memento
-            if(top instanceof MementoAggregate) {
-                // aggregate
-                ((MementoAggregate) top).restore();
-            } else {
-                // normal memento
-                if(!savedLatestState) {
-                    final Memento latestMemento = createMemento();
-                    if(latestMemento != null) {
-                        System.out.println(">> saved Latest, s: " + mementoStored.size() + ", r: " + mementoRestored.size() + ", " + this.toString());
-                        mementoPush();
-                    }
-                    savedLatestState = true; // TODO: fix double undo issue by checking this variable
-                }
-                applyMemento(top);
-            }
-
-            /**
-             * - remove last top stored element
-             * - add it to restore elements
-             */
-            mementoRestored.push(mementoStored.pop());
-
-            // if end is reached, go back one step
-            if(mementoStored.isEmpty()) {
-                mementoStore();
-            }
+        if(keyIdx > 0) {
+            setKey(events.get(keyIdx - 1).getTimestamp());
         }
     }
 
@@ -113,26 +141,13 @@ public abstract class AggregatingOriginator implements OriginatorListener {
      * "redo"
      */
     public void mementoStore(){
-        System.out.println(">> store, s: " + mementoStored.size() + ", r: " + mementoRestored.size() + ", " + this.toString());
+        // find current key
+        int keyIdx = getKeyIdx(currentTimeKey);
 
-        if(mementoCanStore()) {
-            // store restored events
-            final Memento top = mementoRestored.peek();
+        System.out.println(">> store " + keyIdx + " / " + events.size() + ", " + this.toString());
 
-            // apply memento
-            if(top instanceof MementoAggregate) {
-                // aggregate
-                ((MementoAggregate) top).store();
-            } else {
-                // normal memento
-                applyMemento(top);
-            }
-
-            /**
-             * - remove last restored element
-             * - add it to stored elements
-             */
-            mementoStored.push(mementoRestored.pop());
+        if(keyIdx < events.size()-1) {
+            setKey(events.get(keyIdx + 1).getTimestamp());
         }
     }
 
@@ -140,22 +155,27 @@ public abstract class AggregatingOriginator implements OriginatorListener {
      * Clear events
      */
     public void mementoClear(){
-        mementoRestored.clear();
-        mementoStored.clear();
-
-        System.out.println(">> clear, s: " + mementoStored.size() + ", r: " + mementoRestored.size() + ", " + this.toString());
+        events.clear();
     }
 
     public boolean mementoCanRestore(){
-        return !mementoStored.isEmpty();
+        // find current key
+        int keyIdx = getKeyIdx(currentTimeKey);
+        return keyIdx > 0;
     }
 
     public boolean mementoCanStore(){
-        return !mementoRestored.isEmpty();
+        // find current key
+        int keyIdx = getKeyIdx(currentTimeKey);
+        return keyIdx < events.size()-1;
+    }
+
+    public void setParent(AggregatingOriginator originatorListener) {
+        this.parent = originatorListener;
     }
 
     private boolean hasParent(){
-        return originatorListener != null;
+        return parent != null;
     }
 
     /**
@@ -170,47 +190,53 @@ public abstract class AggregatingOriginator implements OriginatorListener {
      */
     protected abstract void applyMemento(Memento memento);
 
-    public void setOriginatorListener(OriginatorListener originatorListener) {
-        this.originatorListener = originatorListener;
-    }
-
-    @Override
-    public boolean onMementoPush(AggregatingOriginator source){
+    public long onMementoPush(AggregatingOriginator source){
         if(hasParent()){
             // aggregate if parent is set
-            return originatorListener.onMementoPush(source);
+            return parent.onMementoPush(source);
         } else {
-            MementoAggregate currentAggregate = getCurrentAggregate();
-            if(currentAggregate == null) {
-                currentAggregate = new MementoAggregate();
-                mementoPush(currentAggregate);
+            final long curTime = System.currentTimeMillis();
+            if(curTime - currentTimeKey > WAITING_TIME) {
+                currentTimeKey = curTime;
             }
-
-            if(!currentAggregate.contains(source)) {
-                if(source == this) {
-                    currentAggregate.setOwnState(createMemento());
-                } else {
-                    currentAggregate.add(source);
-                }
-                return true;
-            } else {
-                return false;
-            }
+            mementoPush(source, null);
+            return currentTimeKey;
         }
     }
 
-    private MementoAggregate getCurrentAggregate(){
-        if(!mementoStored.isEmpty()) {
-            final Memento top = mementoStored.peek();
-            if(top instanceof MementoAggregate) {
-                final MementoAggregate aggregate = (MementoAggregate) top;
-                final long curTime = System.currentTimeMillis();
-                if(curTime - aggregate.getFirstEventTime() <= AGGREGATE_WAITING_TIME){
-                    return aggregate;
+    private class Key {
+
+        private final long timestamp;
+        private final HashMap<AggregatingOriginator, Memento> events = new HashMap<>();
+
+        public Key(long timestamp) {
+            this.timestamp = timestamp;
+        }
+
+        public void add(AggregatingOriginator originator, Memento memento) {
+            if(!events.containsKey(originator)) {
+                events.put(originator, memento);
+            }
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public HashMap<AggregatingOriginator, Memento> getEvents() {
+            return events;
+        }
+
+        private void apply() {
+            for(Entry<AggregatingOriginator, Memento> entry: events.entrySet()) {
+                if(entry.getValue() != null) {
+                    entry.getKey().applyMemento(entry.getValue());
+                } else {
+                    entry.getKey().setKey(timestamp);
                 }
             }
         }
-        return null;
+
     }
 
 }
