@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import mudmap2.backend.memento.AggregatingOriginator;
+import mudmap2.backend.memento.Originator;
 import mudmap2.backend.memento.Memento;
 
 import mudmap2.backend.prquadtree.Quadtree;
@@ -44,7 +44,7 @@ import mudmap2.utils.Pair;
  *
  * @author neop
  */
-public class Layer extends AggregatingOriginator implements WorldChangeListener {
+public class Layer extends Originator implements WorldChangeListener {
 
     private World world;
     private final Integer id;
@@ -228,7 +228,7 @@ public class Layer extends AggregatingOriginator implements WorldChangeListener 
 
             elements.insert(element, element.getX(), element.getY());
             sizeCacheNeedsUpdated = true;
-            ((Place) element).setParent(this);
+            ((Place) element).setMementoParent(this);
             world.callListeners(element);
         } catch (final Exception ex) {
             throw new PlaceNotInsertedException(element.getX(), element.getY());

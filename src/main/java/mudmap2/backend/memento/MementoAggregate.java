@@ -16,117 +16,86 @@
  */
 package mudmap2.backend.memento;
 
-import java.util.LinkedList;
-import java.util.List;
+import java.util.HashSet;
 
 /**
  * A collection of event Originators
  * @author neop
  */
-public class MementoAggregate implements Memento {
+class MementoAggregate {
 
     /**
-     * List of Originator events
+     * Timestamp of this Memento
      */
-    private final List<AggregatingOriginator> events = new LinkedList<>();
+    private final long timestamp;
 
     /**
-     * State of own Originator
+     * Memento of owner, if set
      */
-    private Memento ownState = null;
+    private Memento ownMemento = null;
 
     /**
-     * Time of first event in ms
+     * References to Originators that have been changed within this timestamp
      */
-    private long firstEventTime = 0;
-
-    public MementoAggregate(){
-    }
-
-    public MementoAggregate(AggregatingOriginator event){
-        events.add(event);
-    }
+    private final HashSet<Originator> modifiedOriginators = new HashSet<>();
 
     /**
-     * Add Originator event to list
-     * @param event Originator that threw this event
+     * Constructor
+     * @param timestamp timestamp of first modification
      */
-    public void add(AggregatingOriginator event){
-        if(firstEventTime == 0) {
-            firstEventTime = System.currentTimeMillis();
-        }
-        events.add(event);
+    public MementoAggregate(long timestamp) {
+        this.timestamp = timestamp;
     }
 
     /**
-     * Check whether any events have been added
-     * @return true if there are no events in list
+     * Gets the timestamp of first modification
+     * @return timestamp of first modification
      */
-    public boolean isEmpty(){
-        return events.isEmpty();
+    public long getTimestamp() {
+        return timestamp;
     }
 
     /**
-     * store all Originators event
+     * Get Memento of owner
+     * @return Memento of owner
      */
-    public void store(){
-        for(AggregatingOriginator event: events){
-            event.mementoStore();
-        }
+    public Memento getOwnMemento() {
+        return ownMemento;
     }
 
     /**
-     * Restore all Originators event
+     * Set Memento of owner
+     * @param ownMemento Memento of owner
      */
-    public void restore(){
-        for(AggregatingOriginator event: events){
-            event.mementoRestore();
+    public void setOwnMemento(final Memento ownMemento) {
+        this.ownMemento = ownMemento;
+    }
+
+    /**
+     * Add modified Originator
+     * @param originator modified Originator
+     */
+    public void addModifiedOriginator(final Originator originator) {
+        if(!modifiedOriginators.contains(originator)) {
+            modifiedOriginators.add(originator);
         }
     }
 
     /**
-     * Get state of own Originator
-     * @return Memento or null
+     * Check whether any values have been set
+     * @return true if own memento is not set and no modified Originators have been added
      */
-    public Memento getOwnState() {
-        return ownState;
+    public boolean isEmpty() {
+        return ownMemento == null && modifiedOriginators.isEmpty();
     }
 
     /**
-     * Set state of own Originator
-     * @param ownState
+     * Set modified Originators to this state
      */
-    public void setOwnState(Memento ownState) {
-        this.ownState = ownState;
-    }
-
-    /**
-     * Check whether ownState has been set
-     * @return true if ownState has been set
-     */
-    public boolean hasOwnState(){
-        return ownState != null;
-    }
-
-    /**
-     * Check whether list contains source
-     * @param source event source
-     * @return true if list contains source
-     */
-    public boolean contains(AggregatingOriginator source){
-        return events.contains(source);
-    }
-
-    /**
-     * Get list of events
-     * @return list of events
-     */
-    protected List<AggregatingOriginator> getList(){
-        return events;
-    }
-
-    public long getFirstEventTime() {
-        return firstEventTime;
+    public void updateModifiedOriginators() {
+        for(Originator originator: modifiedOriginators) {
+            originator.goToTimestamp(timestamp);
+        }
     }
 
 }

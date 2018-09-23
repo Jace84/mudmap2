@@ -146,6 +146,7 @@ public class WorldFileJSON extends WorldFile {
 
             // create world root
             world = new World(worldName);
+            world.setMementoParentEnabled(false);
             world.setWorldFile(this);
 
             // showPlaceID
@@ -404,7 +405,7 @@ public class WorldFileJSON extends WorldFile {
             throw new WorldFileReadError(filename, ex.getLocalizedMessage(), ex);
         }
 
-        world.mementoClear();
+        world.setMementoParentEnabled(true);
         return world;
     }
 

@@ -35,7 +35,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import mudmap2.backend.Layer.PlaceNotInsertedException;
 import mudmap2.backend.WorldFileReader.WorldFile;
-import mudmap2.backend.memento.AggregatingOriginator;
+import mudmap2.backend.memento.Originator;
 import mudmap2.backend.memento.Memento;
 import mudmap2.backend.sssp.BreadthSearchGraph;
 import org.json.JSONObject;
@@ -44,7 +44,7 @@ import org.json.JSONObject;
  *
  * @author neop
  */
-public class World extends AggregatingOriginator implements BreadthSearchGraph {
+public class World extends Originator implements BreadthSearchGraph {
 
     // worldname and file of the world
     private String worldName;
@@ -223,7 +223,7 @@ public class World extends AggregatingOriginator implements BreadthSearchGraph {
         if(!layers.containsKey(layer.getId()))
             layers.put(layer.getId(), layer);
 
-        layer.setParent(this);
+        layer.setMementoParent(this);
         addChangeListener(layer);
         callListeners(layer);
     }
