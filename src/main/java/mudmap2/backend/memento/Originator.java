@@ -38,6 +38,9 @@ public abstract class Originator {
     private Originator parent;
     private boolean enabled = true;
 
+    // memento event listeners for external observers (ui etc)
+    private final HashSet<Listener> listeners = new HashSet<>();
+
     public Originator() {
         parent = null;
     }
@@ -75,6 +78,7 @@ public abstract class Originator {
                 notifyChange(this, curTime);
             } else if(!modified.contains(this)) {
                 modified.add(this);
+                callListeners();
             }
         }
     }
@@ -113,6 +117,8 @@ public abstract class Originator {
             if(history.size() >= curHistoryIdx+1) {
                 applyMementoAggregate(history.get(curHistoryIdx));
             }
+
+            callListeners();
         }
     }
 
@@ -127,7 +133,25 @@ public abstract class Originator {
             if(curHistoryIdx+1 < history.size()) {
                 applyMementoAggregate(history.get(++curHistoryIdx));
             }
+
+            callListeners();
         }
+    }
+
+    /**
+     * Check whether the state can be restored
+     * @return true if the state can be restored
+     */
+    public boolean canRestore() {
+        return !history.isEmpty();
+    }
+
+    /**
+     * Check whether the state can be stored
+     * @return true if the state can be stored
+     */
+    public boolean canStore() {
+        return history.size() > curHistoryIdx+1;
     }
 
     /**
@@ -346,6 +370,8 @@ public abstract class Originator {
             if(!modified.contains(modifiedOriginator)) {
                 modified.add(modifiedOriginator);
             }
+
+            callListeners();
         }
     }
 
@@ -370,5 +396,38 @@ public abstract class Originator {
             applyMemento(memento.getOwnMemento());
         }
         memento.updateModifiedOriginators();
+    }
+
+    /**
+     * Add memento event listener (eg for UI observer)
+     * @param listener event listener
+     */
+    public void addMementoListener(Listener listener) {
+        if(!listeners.contains(listener)) {
+            listeners.add(listener);
+        }
+    }
+
+    /**
+     * Remove memento event listener
+     * @param listener event listener
+     */
+    public void removeListener(Listener listener) {
+        listeners.remove(listener);
+    }
+
+    /**
+     * Call memento event listeners
+     */
+    private void callListeners() {
+        for(Listener listener: listeners) {
+            listener.onMementoEvent(this);
+        }
+    }
+
+    public interface Listener {
+
+        void onMementoEvent(final Object source);
+
     }
 }

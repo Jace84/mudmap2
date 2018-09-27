@@ -35,7 +35,6 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.net.URL;
-import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -60,6 +59,7 @@ import mudmap2.backend.World;
 import mudmap2.backend.WorldFileList;
 import mudmap2.backend.WorldFileList.WorldFileEntry;
 import mudmap2.backend.WorldManager;
+import mudmap2.backend.memento.Originator;
 import mudmap2.frontend.GUIElement.WorldPanel.MapPainterDefault;
 import mudmap2.frontend.dialog.AboutDialog;
 import mudmap2.frontend.dialog.EditWorldDialog;
@@ -81,12 +81,7 @@ import mudmap2.utils.StringHelper;
  * call setVisible(true) to show window
  * @author neop
  */
-public final class Mainwindow extends JFrame implements KeyEventDispatcher, ActionListener, ChangeListener {
-
-    private static final long serialVersionUID = 1L;
-
-    // Contains all opened maps <name, worldtab>
-    HashMap<World, WorldTab> worldTabs;
+public final class Mainwindow extends JFrame implements KeyEventDispatcher, ActionListener, ChangeListener, Originator.Listener {
 
     // GUI elements
     JCheckBoxMenuItem menuWorldCurvedPaths;
@@ -97,6 +92,8 @@ public final class Mainwindow extends JFrame implements KeyEventDispatcher, Acti
     JMenuItem menuFileSaveAs;
     JMenuItem menuFileSaveAsImage;
 
+    JMenuItem menuWorldUndo;
+    JMenuItem menuWorldRedo;
     JMenuItem menuWorldEditWorld;
     JMenuItem menuWorldPathColors;
     JMenuItem menuWorldPlaceGroups;
@@ -120,10 +117,8 @@ public final class Mainwindow extends JFrame implements KeyEventDispatcher, Acti
         setIconImage(iconimage.getImage());
 
         // create GUI
-        worldTabs = new HashMap<>();
-
         setSize(900, 600);
-        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(final WindowEvent arg0) {
@@ -178,6 +173,9 @@ public final class Mainwindow extends JFrame implements KeyEventDispatcher, Acti
         }
 
         //menu entries: World
+        menuWorldUndo = MenuHelper.addMenuItem(menuWorld, "Undo", "undo", KeyEvent.VK_U, KeystrokeHelper.ctrl(KeyEvent.VK_Z), this);
+        menuWorldRedo = MenuHelper.addMenuItem(menuWorld, "Redo", "redo", KeyEvent.VK_R, KeystrokeHelper.ctrl(KeyEvent.VK_Y), this);
+        menuWorld.addSeparator();
         menuWorldEditWorld = MenuHelper.addMenuItem(menuWorld, "Edit World", "edit_world", this);
         menuWorldPathColors = MenuHelper.addMenuItem(menuWorld, "Path colors", "path_colors", this);
         menuWorldPlaceGroups = MenuHelper.addMenuItem(menuWorld, "Place Groups", "place_group_dialog", this);
@@ -232,14 +230,16 @@ public final class Mainwindow extends JFrame implements KeyEventDispatcher, Acti
             tabbedPane.addChangeListener(this);
         }
 
-        if (!worldTabs.containsKey(world)) {
+        // check whether world is opened already
+        WorldTab worldTab = getWorldTab(world);
+
+        if (worldTab == null) {
             // open new tab
-            final WorldTab tab = new WorldTab(this, world, false);
-            worldTabs.put(world, tab);
-            tabbedPane.addTab(tab.getWorld().getName(), tab);
+            worldTab = new WorldTab(this, world, false);
+            tabbedPane.addTab(worldTab.getWorld().getName(), worldTab);
         }
         // change current tab
-        tabbedPane.setSelectedComponent(worldTabs.get(world));
+        tabbedPane.setSelectedComponent(worldTab);
 
         final WorldTab curTab = getSelectedTab();
         if (curTab != null) {
@@ -250,30 +250,54 @@ public final class Mainwindow extends JFrame implements KeyEventDispatcher, Acti
         if (world.getWorldFile() != null) {
             WorldFileList.push(new WorldFileList.WorldFileEntry(world.getName(), new File(world.getWorldFile().getFilename())));
         }
+
+        world.addMementoListener(this);
+    }
+
+    /**
+     * Get tab of a world
+     * @param world world to search for
+     * @return WorldTab or null if not found
+     */
+    private WorldTab getWorldTab(final World world) {
+        WorldTab ret = null;
+
+        for(int i = 0; i < tabbedPane.getTabCount(); ++i) {
+            final Component component = tabbedPane.getTabComponentAt(i);
+            if(component instanceof WorldTab) {
+                WorldTab worldTab = (WorldTab) component;
+                if(worldTab.getWorld() == world) {
+                    ret = worldTab;
+                    break;
+                }
+            }
+        }
+        return ret;
     }
 
     /**
      * Closes all tabs
+     * @return true if all tabs are closed, false if cancelled by user
      */
-    public void closeTabs() {
-        for (final WorldTab tab : worldTabs.values()) {
-            final int ret = JOptionPane.showConfirmDialog(this, StringHelper.join("Save world \"", tab.getWorld().getName(), "\"?"), "Save world", JOptionPane.YES_NO_OPTION);
-            if (ret == JOptionPane.YES_OPTION) {
-                tab.save();
+    public boolean closeTabs() {
+        while(tabbedPane.getTabCount() > 0){
+            Component component = tabbedPane.getComponentAt(0);
+            if(component instanceof WorldTab) {
+                WorldTab tab = (WorldTab) component;
+                final int ret = JOptionPane.showConfirmDialog(this, StringHelper.join("Save world \"", tab.getWorld().getName(), "\"?"), "Save world", JOptionPane.YES_NO_CANCEL_OPTION);
+                if (ret == JOptionPane.YES_OPTION) {
+                    tab.save();
+                } else if (ret == JOptionPane.CANCEL_OPTION) {
+                    return false;
+                }
+                WorldManager.close(tab.getWorld());
+                tabbedPane.remove(0);
+            } else {
+                System.err.println("Removing unknown tab element!");
+                tabbedPane.remove(0);
             }
-            WorldManager.close(tab.getWorld());
-            removeTab(tab);
         }
-    }
-
-    /**
-     * Removes a tab without saving and closing the world in WorldManager
-     * @param tab
-     */
-    public void removeTab(final WorldTab tab) {
-        if (tabbedPane != null) {
-            tabbedPane.remove(tab);
-        }
+        return true;
     }
 
     /**
@@ -298,16 +322,41 @@ public final class Mainwindow extends JFrame implements KeyEventDispatcher, Acti
      * Saves all config
      */
     public void quit() {
-        closeTabs();
+        boolean allClosed = closeTabs();
         WorldFileList.write();
-        System.exit(0);
+        if(allClosed) {
+            System.exit(0);
+        }
+    }
+
+    /**
+     * Try to undo changes
+     */
+    private void undo() {
+        final WorldTab wt = getSelectedTab();
+        if (wt != null) {
+            wt.getWorld().mementoRestore();
+            wt.repaint();
+        }
+    }
+
+    /**
+     * Try to redo changes
+     */
+    private void redo() {
+        final WorldTab wt = getSelectedTab();
+        if (wt != null) {
+            wt.getWorld().mementoStore();
+            wt.repaint();
+        }
     }
 
     /**
      * Updates menu items when the tab changes
      */
     private void updateMenus() {
-        final boolean enabled = tabbedPane != null && tabbedPane.getSelectedComponent() instanceof WorldTab;
+        final WorldTab wt = getSelectedTab();
+        final boolean enabled = wt != null;
         menuFileSave.setEnabled(enabled);
         menuFileSaveAs.setEnabled(enabled);
         menuFileSaveAsImage.setEnabled(enabled);
@@ -332,6 +381,14 @@ public final class Mainwindow extends JFrame implements KeyEventDispatcher, Acti
             menuWorldShowGrid.setState(mapPainter.isGridEnabled());
             menuWorldCurvedPaths.setState(mapPainter.getPathsCurved());
         }*/
+
+        if(enabled) {
+            menuWorldUndo.setEnabled(wt.getWorld().canRestore());
+            menuWorldRedo.setEnabled(wt.getWorld().canStore());
+        } else {
+            menuWorldUndo.setEnabled(false);
+            menuWorldRedo.setEnabled(false);
+        }
     }
 
     @Override
@@ -364,6 +421,12 @@ public final class Mainwindow extends JFrame implements KeyEventDispatcher, Acti
             break;
         case "quit":
             quit();
+            break;
+        case "undo":
+            undo();
+            break;
+        case "redo":
+            redo();
             break;
         case "edit_world":
             if (wt != null) {
@@ -465,27 +528,24 @@ public final class Mainwindow extends JFrame implements KeyEventDispatcher, Acti
                 }
                 return true;
             }
-            case KeyEvent.VK_Z: // undo change(s)
-            {
-                final WorldTab wt = getSelectedTab();
-                if (wt != null) {
-                    wt.getWorld().mementoRestore();
-                    wt.repaint();
+            case KeyEvent.VK_Z: // undo change(s), also ctrl+shift for redo
+                if(!e.isShiftDown()) {
+                    undo();
+                } else {
+                    redo();
                 }
                 return true;
-            }
-            case KeyEvent.VK_Y: // undo change(s)
-            {
-                final WorldTab wt = getSelectedTab();
-                if (wt != null) {
-                    wt.getWorld().mementoStore();
-                    wt.repaint();
-                }
+            case KeyEvent.VK_Y: // redo change(s)
+                redo();
                 return true;
-            }
             }
         }
         return false;
+    }
+
+    @Override
+    public void onMementoEvent(final Object source) {
+        updateMenus();
     }
 
 }

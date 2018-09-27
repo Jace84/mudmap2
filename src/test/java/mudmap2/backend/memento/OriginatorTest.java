@@ -425,6 +425,38 @@ public class OriginatorTest {
         }
     }
 
+    public void testCanRestore() {
+        System.out.println("canRestore");
+
+        TestOriginator instance = new TestOriginator();
+        assertFalse(instance.canRestore());
+
+        instance.mementoPush();
+        assertTrue(instance.canRestore());
+
+        instance.mementoRestore();
+        assertFalse(instance.canRestore());
+
+        instance.mementoStore();
+        assertTrue(instance.canRestore());
+    }
+
+    public void testCanStore() {
+        System.out.println("canStore");
+
+        TestOriginator instance = new TestOriginator();
+        assertFalse(instance.canStore());
+
+        instance.mementoPush();
+        assertFalse(instance.canStore());
+
+        instance.mementoRestore();
+        assertTrue(instance.canStore());
+
+        instance.mementoStore();
+        assertFalse(instance.canStore());
+    }
+
     private class TestMemento implements Memento {
 
         final int testVar;
