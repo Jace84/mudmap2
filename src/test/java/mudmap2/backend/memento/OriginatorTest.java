@@ -457,6 +457,89 @@ public class OriginatorTest {
         assertFalse(instance.canStore());
     }
 
+    public void testMementoJoin() {
+        System.out.println("mementoJoin");
+
+        TestOriginator parent = new TestOriginator();
+        TestOriginator child = new TestOriginator();
+        child.setMementoParent(parent);
+
+        final int val1 = 12;
+        final int val2 = 23;
+        final int val3 = 34;
+        final int val4 = 45;
+
+        final int val5 = 56;
+        final int val6 = 67;
+        final int val7 = 78;
+        final int val8 = 89;
+
+        try {
+            final LinkedList<MementoAggregate> historyParent = (LinkedList<MementoAggregate>) fieldHistory.get(parent);
+            final LinkedList<MementoAggregate> historyChild = (LinkedList<MementoAggregate>) fieldHistory.get(child);
+
+            child.testVar = val1;
+            parent.testVar = val5;
+            child.mementoPush();
+            Thread.sleep(1100);
+            child.testVar = val2;
+            parent.testVar = val6;
+            child.mementoPush();
+            Thread.sleep(1100);
+            child.testVar = val3;
+            parent.testVar = val7;
+            child.mementoPush();
+            Thread.sleep(1100);
+            child.testVar = val4;
+            parent.testVar = val8;
+            child.mementoPush();
+
+            // check history size
+            assertEquals(4, historyParent.size());
+            assertEquals(4, historyChild.size());
+
+            final MementoAggregate mementoParentOld = historyParent.get(1);
+            final MementoAggregate mementoParentNew = historyParent.get(2);
+            final MementoAggregate mementoChildOld = historyChild.get(1);
+            final MementoAggregate mementoChildNew = historyChild.get(2);
+
+            final Memento memCO = mementoChildOld.getOwnMemento();
+            final Memento memPO = mementoParentOld.getOwnMemento();
+
+            // check equal timestamps
+            assertEquals(mementoParentOld.getTimestamp(), mementoChildOld.getTimestamp());
+            assertEquals(mementoParentNew.getTimestamp(), mementoChildNew.getTimestamp());
+
+            // assert memento references
+            assertNotNull(mementoChildOld.getOwnMemento());
+            assertNotNull(mementoChildNew.getOwnMemento());
+            assertNotNull(mementoParentOld.getOwnMemento());
+            assertNotNull(mementoParentNew.getOwnMemento());
+
+            assertNotSame(memCO, mementoChildNew.getOwnMemento());
+            assertNotSame(memPO, mementoParentNew.getOwnMemento());
+
+            // do join
+            parent.mementoJoin(mementoParentOld.getTimestamp(), mementoParentNew.getTimestamp());
+
+            // check history size
+            assertEquals(3, historyParent.size());
+            assertEquals(3, historyChild.size());
+
+            // assert memento references
+            assertNull(mementoChildOld.getOwnMemento());
+            assertNotNull(mementoChildNew.getOwnMemento());
+            assertNull(mementoParentOld.getOwnMemento());
+            assertNotNull(mementoParentNew.getOwnMemento());
+
+            assertEquals(memCO, mementoChildNew.getOwnMemento());
+            assertEquals(memPO, mementoParentNew.getOwnMemento());
+        } catch (InterruptedException | IllegalAccessException ex) {
+            Logger.getLogger(OriginatorTest.class.getName()).log(Level.SEVERE, null, ex);
+            fail(ex.getMessage());
+        }
+    }
+
     private class TestMemento implements Memento {
 
         final int testVar;

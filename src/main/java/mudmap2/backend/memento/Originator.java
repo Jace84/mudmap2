@@ -34,6 +34,7 @@ public abstract class Originator {
 
     // modified Originators
     private final HashSet<Originator> modified = new HashSet<>();
+    MementoAggregate lastModified = null;
 
     private Originator parent;
     private boolean enabled = true;
@@ -68,6 +69,12 @@ public abstract class Originator {
                 entry.setOwnMemento(createMemento());
                 saveModified(entry);
                 history.add(entry);
+            }
+
+            // join entry with previous 'modified-list' entry
+            if(lastModified != null) {
+                mementoJoin(lastModified, entry);
+                lastModified = null;
             }
 
             // reset index
@@ -106,6 +113,8 @@ public abstract class Originator {
                 saveModified(entry);
                 history.add(entry);
                 curHistoryIdx = history.size()-1;
+
+                lastModified = entry;
             }
 
             // move history index
@@ -372,6 +381,45 @@ public abstract class Originator {
             }
 
             callListeners();
+        }
+    }
+
+    /**
+     * Joins MementoAggregates by timestamp
+     * @param oldTimestamp timestamp to be joined
+     * @param newTimestamp timestamp to be joined into
+     */
+    protected void mementoJoin(final long oldTimestamp, final long newTimestamp) {
+        MementoAggregate oldMemento = null;
+        MementoAggregate newMemento = null;
+
+        // find entries to join
+        for(int i = history.size()-1; i >= 0; --i) {
+            MementoAggregate entry = history.get(i);
+            if(entry.getTimestamp() == newTimestamp) {
+                newMemento = entry;
+            } else if(entry.getTimestamp() == oldTimestamp) {
+                oldMemento = entry;
+            } else if(newMemento != null && oldMemento != null) {
+                break;
+            }
+        }
+
+        // join
+        mementoJoin(oldMemento, newMemento);
+    }
+
+    /**
+     * Joins MementoAggregates
+     * @param oldMemento aggregate to be joined
+     * @param newMemento aggregate to be joined into
+     */
+    private void mementoJoin(final MementoAggregate oldMemento, final MementoAggregate newMemento) {
+        if(oldMemento != null && newMemento != null) {
+            // join oldMemento into newMemento
+            newMemento.join(oldMemento);
+            // remove old entry from history
+            history.remove(oldMemento);
         }
     }
 

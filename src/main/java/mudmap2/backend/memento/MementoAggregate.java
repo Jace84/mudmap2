@@ -98,4 +98,23 @@ class MementoAggregate {
         }
     }
 
+    /**
+     * Join MementoAggregates
+     * @param other other aggregate to be joined into this one, will be cleared
+     */
+    protected void join(MementoAggregate other) {
+        // join children
+        for(Originator originator: other.modifiedOriginators) {
+            originator.mementoJoin(other.getTimestamp(), getTimestamp());
+        }
+
+        // join other into this
+        setOwnMemento(other.getOwnMemento());
+        modifiedOriginators.addAll(other.modifiedOriginators);
+
+        // clear other
+        other.setOwnMemento(null);
+        other.modifiedOriginators.clear();
+    }
+
 }

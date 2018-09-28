@@ -280,7 +280,7 @@ public final class Mainwindow extends JFrame implements KeyEventDispatcher, Acti
      * @return true if all tabs are closed, false if cancelled by user
      */
     public boolean closeTabs() {
-        while(tabbedPane.getTabCount() > 0){
+        while(tabbedPane != null && tabbedPane.getTabCount() > 0){
             Component component = tabbedPane.getComponentAt(0);
             if(component instanceof WorldTab) {
                 WorldTab tab = (WorldTab) component;
