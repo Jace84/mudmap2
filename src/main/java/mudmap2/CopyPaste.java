@@ -24,8 +24,6 @@ import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.swing.JOptionPane;
-
 import mudmap2.backend.Layer;
 import mudmap2.backend.LayerElement;
 import mudmap2.backend.Path;
@@ -131,97 +129,91 @@ public final class CopyPaste {
             return false;
         }
 
-        // ask user
-        final String title = (copyMode ? "Copy " : "Paste ") + "place(s)";
-        final String message = title + "? This can not be undone!" + (copyPlaces.iterator().next().getLayer().getWorld() != layer.getWorld() ? " Pasting to another world might cause problems!" : "");
-        final int ret = JOptionPane.showConfirmDialog(null, message, title, JOptionPane.YES_NO_OPTION);
-        if (ret == JOptionPane.YES_OPTION) {
-            // map to translate from old to new place
-            final HashMap<Place, Place> place_to_new_place = new HashMap<Place, Place>();
+        // map to translate from old to new place
+        final HashMap<Place, Place> place_to_new_place = new HashMap<>();
 
-            Place[] places;
+        Place[] places;
 
-            if (copyMode) {
-                places = copyPlaces.toArray(new Place[copyPlaces.size()]);
-            } else {
-                // getPlace movement direction
-                final int fact_x = x <= copydx ? 1 : -1;
-                final int fact_y = y <= copydy ? 1 : -1;
+        if (copyMode) {
+            places = copyPlaces.toArray(new Place[copyPlaces.size()]);
+        } else {
+            // getPlace movement direction
+            final int fact_x = x <= copydx ? 1 : -1;
+            final int fact_y = y <= copydy ? 1 : -1;
 
-                // sort places
-                final ArrayList<Place> ordered_places = new ArrayList<>(copyPlaces);
-                Collections.sort(ordered_places, new Comparator<Place>() {
-                    @Override
-                    public int compare(final Place t, final Place t1) {
-                        // order by movement direction:
-                        // places that might collide with other places in the
-                        // list will be moved first
-                        if (fact_x * t.getX() > fact_x * t1.getX()) {
+            // sort places
+            final ArrayList<Place> ordered_places = new ArrayList<>(copyPlaces);
+            Collections.sort(ordered_places, new Comparator<Place>() {
+                @Override
+                public int compare(final Place t, final Place t1) {
+                    // order by movement direction:
+                    // places that might collide with other places in the
+                    // list will be moved first
+                    if (fact_x * t.getX() > fact_x * t1.getX()) {
+                        return 1;
+                    } else if (t.getX() == t1.getX()) {
+                        if (fact_y * t.getY() > fact_y * t1.getY()) {
                             return 1;
-                        } else if (t.getX() == t1.getX()) {
-                            if (fact_y * t.getY() > fact_y * t1.getY()) {
-                                return 1;
-                            } else if (t.getY() == t1.getY()) {
-                                return 0;
-                            }
-                        }
-                        return -1;
-                    }
-                });
-
-                places = ordered_places.toArray(new Place[ordered_places.size()]);
-            }
-
-            // copy places
-            for (final Place place : places) {
-                try {
-                    if (place.getLayer().getWorld() != layer.getWorld()) {
-                        if (place.getPlaceGroup() != null && !layer.getWorld().getPlaceGroups().contains(place.getPlaceGroup())) {
-                            layer.getWorld().addPlaceGroup(place.getPlaceGroup());
+                        } else if (t.getY() == t1.getY()) {
+                            return 0;
                         }
                     }
-                    if (copyMode) { // copy places -> duplicate on new layer
-                        final Place new_place = place.duplicate();
-                        place_to_new_place.put(place, new_place);
-                        layer.put(new_place, place.getX() - copydx + x, place.getY() - copydy + y);
-                    } else {
-                        // remove place from old layer and add it to new one
-                        layer.put(place, place.getX() - copydx + x, place.getY() - copydy + y);
-                    }
-                } catch (final Exception ex) {
-                    Logger.getLogger(Mudmap2.class.getName()).log(Level.SEVERE, null, ex);
-                    return false;
+                    return -1;
                 }
-            }
+            });
 
-            // recreate paths and child connections after copy-paste
-            if (copyMode) {
-                for (final Place place : copyPlaces) {
-                    final Place new_place = place_to_new_place.get(place);
-                    // connect paths
-                    for (final Path path : place.getPaths()) {
-                        // only check first place, because the other side will
-                        // check itself
-                        final Place path_end_place = path.getPlaces()[0];
-                        // if end place is not this place and is also copied
-                        if (path_end_place != place && copyPlaces.contains(path_end_place)) {
-                            final Place other_new_place = place_to_new_place.get(path_end_place);
-                            new_place.connectPath(new Path(other_new_place, path.getExitDirections()[0], new_place, path.getExitDirections()[1]));
-                        }
-                    }
-                    // connect children
-                    for (final Place child : place.getChildren()) {
-                        // if child is copied, too
-                        if (copyPlaces.contains(child)) {
-                            final Place new_child = place_to_new_place.get(child);
-                            new_place.connectChild(new_child);
-                        }
+            places = ordered_places.toArray(new Place[ordered_places.size()]);
+        }
+
+        // copy places
+        for (final Place place : places) {
+            try {
+                if (place.getLayer().getWorld() != layer.getWorld()) {
+                    if (place.getPlaceGroup() != null && !layer.getWorld().getPlaceGroups().contains(place.getPlaceGroup())) {
+                        layer.getWorld().addPlaceGroup(place.getPlaceGroup());
                     }
                 }
-                // moving places modifies their coordinates so that they cant be pasted again
-            } else {
-                resetCopy();
+                if (copyMode) { // copy places -> duplicate on new layer
+                    final Place new_place = place.duplicate();
+                    place_to_new_place.put(place, new_place);
+                    layer.put(new_place, place.getX() - copydx + x, place.getY() - copydy + y);
+                } else {
+                    // remove place from old layer and add it to new one
+                    layer.put(place, place.getX() - copydx + x, place.getY() - copydy + y);
+                }
+            } catch (final Exception ex) {
+                Logger.getLogger(Mudmap2.class.getName()).log(Level.SEVERE, null, ex);
+                return false;
             }
+        }
+
+        // recreate paths and child connections after copy-paste
+        if (copyMode) {
+            for (final Place place : copyPlaces) {
+                final Place new_place = place_to_new_place.get(place);
+                // connect paths
+                for (final Path path : place.getPaths()) {
+                    // only check first place, because the other side will
+                    // check itself
+                    final Place path_end_place = path.getPlaces()[0];
+                    // if end place is not this place and is also copied
+                    if (path_end_place != place && copyPlaces.contains(path_end_place)) {
+                        final Place other_new_place = place_to_new_place.get(path_end_place);
+                        new_place.connectPath(new Path(other_new_place, path.getExitDirections()[0], new_place, path.getExitDirections()[1]));
+                    }
+                }
+                // connect children
+                for (final Place child : place.getChildren()) {
+                    // if child is copied, too
+                    if (copyPlaces.contains(child)) {
+                        final Place new_child = place_to_new_place.get(child);
+                        new_place.connectChild(new_child);
+                    }
+                }
+            }
+            // moving places modifies their coordinates so that they cant be pasted again
+        } else {
+            resetCopy();
         }
 
         // cleanup

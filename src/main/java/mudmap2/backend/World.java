@@ -170,10 +170,12 @@ public class World extends Originator implements BreadthSearchGraph {
      * @param layerId layer
      * @param x x coordinate
      * @param y y coordinate
+     * @return place or null
      */
-    public void putPlaceholder(int layerId, int x, int y){
+    public Place putPlaceholder(int layerId, int x, int y){
+        Place place;
         try {
-            Place place = new Place(Place.PLACEHOLDER_NAME, x, y, null);
+            place = new Place(Place.PLACEHOLDER_NAME, x, y, null);
 
             // find or create placeholder group
             PlaceGroup placeGroup = null;
@@ -194,9 +196,13 @@ public class World extends Originator implements BreadthSearchGraph {
             }
             layer.put(place, x, y);
         } catch(PlaceNotInsertedException ex){ // ignore
+            place = null;
         } catch (Exception ex) {
             Logger.getLogger(World.class.getName()).log(Level.WARNING, "Couldn't put placeholder to map: " + ex, ex);
+            place = null;
         }
+
+        return place;
     }
 
     // --------- layers --------------------------------------------------------

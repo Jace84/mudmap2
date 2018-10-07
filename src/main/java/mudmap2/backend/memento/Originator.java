@@ -71,12 +71,6 @@ public abstract class Originator {
                 history.add(entry);
             }
 
-            // join entry with previous 'modified-list' entry
-            if(lastModified != null) {
-                mementoJoin(lastModified, entry);
-                lastModified = null;
-            }
-
             // reset index
             curHistoryIdx = history.size()-1;
 
@@ -87,6 +81,9 @@ public abstract class Originator {
                 modified.add(this);
                 callListeners();
             }
+
+            // join entry with previous 'modified-list' entry
+            parentJoinLastModified(entry.getTimestamp());
         }
     }
 
@@ -205,6 +202,18 @@ public abstract class Originator {
                 }
             }
             modified.clear();
+        }
+    }
+
+        private void parentJoinLastModified(final long newTimestamp) {
+        if(hasParent()) {
+            parent.parentJoinLastModified(newTimestamp);
+        } else {
+            // join entry with previous 'modified-list' entry
+            if(lastModified != null && lastModified.getTimestamp() != newTimestamp && history.contains(lastModified)) {
+                mementoJoin(lastModified.getTimestamp(), newTimestamp);
+                lastModified = null;
+            }
         }
     }
 
@@ -394,15 +403,19 @@ public abstract class Originator {
         MementoAggregate newMemento = null;
 
         // find entries to join
-        for(int i = history.size()-1; i >= 0; --i) {
+        for(int i = history.size()-1; i >= 0 && (newMemento == null || oldMemento == null); --i) {
             MementoAggregate entry = history.get(i);
             if(entry.getTimestamp() == newTimestamp) {
                 newMemento = entry;
             } else if(entry.getTimestamp() == oldTimestamp) {
                 oldMemento = entry;
-            } else if(newMemento != null && oldMemento != null) {
-                break;
             }
+        }
+
+        // create empty memento if there is no new memento to join to ("relabel by copy")
+        if(oldMemento != null && newMemento == null) {
+            newMemento = new MementoAggregate(newTimestamp);
+            history.add(newMemento);
         }
 
         // join
@@ -420,6 +433,7 @@ public abstract class Originator {
             newMemento.join(oldMemento);
             // remove old entry from history
             history.remove(oldMemento);
+            curHistoryIdx = Math.max(0, curHistoryIdx-1);
         }
     }
 

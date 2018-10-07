@@ -62,7 +62,7 @@ public class Quadtree<T> {
         centerX = quadtree.centerX;
         centerY = quadtree.centerY;
         root = new QuadtreeNode(null, centerX, centerY, DEFAULT_LENGTH);
-        if(quadtree != null && quadtree.root != null){
+        if(quadtree.root != null){
             quadtree.root.copy(root);
         }
     }
@@ -534,6 +534,10 @@ public class Quadtree<T> {
             return false;
         }
 
+        /**
+         * Deep copy of tree node
+         * @param target
+         */
         public void copy(QuadtreeNode target) {
             for(int i = 0; i < 4; ++i){
                 QuadtreeElement element = elements[i];

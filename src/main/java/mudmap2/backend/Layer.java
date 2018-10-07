@@ -221,9 +221,10 @@ public class Layer extends Originator implements WorldChangeListener {
         mementoPush();
 
         try {
-            // remove element from other layer if one is set
+            // remove element from layer if one is set
             if(element.getLayer() != null){
                 element.getLayer().remove(element);
+                element.setPosition(element.getX(), element.getY(), this);
             }
 
             elements.insert(element, element.getX(), element.getY());
